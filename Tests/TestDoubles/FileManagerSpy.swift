@@ -31,6 +31,7 @@ class FileManagerSpy: Spy, FileSystemManager {
     var changeCurrentDirectoryPath: [String] = []
     var errorToThrow: Error?
     var subpathsToReturn: [String]?
+    var contentsOfDirectoryToReturn: [String: [String]] = [:]
     var fileExistsToReturn: [Bool] = []
     var contentsAtPathSortedToReturn: [String] = []
 
@@ -96,6 +97,11 @@ class FileManagerSpy: Spy, FileSystemManager {
     ) -> [String]? {
         methodCalls.append(#function)
         return subpathsToReturn
+    }
+
+    func contentsOfDirectory(atPath path: String) throws -> [String] {
+        methodCalls.append(#function)
+        return contentsOfDirectoryToReturn[path] ?? []
     }
 
     func fileExists(
