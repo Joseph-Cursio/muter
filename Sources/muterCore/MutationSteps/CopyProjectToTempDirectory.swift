@@ -30,6 +30,11 @@ class CopyProjectToTempDirectory: MutationStep {
                 toPath: state.mutatedProjectDirectoryURL.path
             )
 
+            removeCopiedModuleCaches(
+                inProjectAt: state.mutatedProjectDirectoryURL.path,
+                using: manager
+            )
+
             notificationCenter.post(
                 name: .projectCopyFinished,
                 object: state.mutatedProjectDirectoryURL.path
@@ -40,6 +45,35 @@ class CopyProjectToTempDirectory: MutationStep {
             throw MuterError.projectCopyFailed(
                 reason: error.localizedDescription
             )
+        }
+    }
+}
+
+/// Deletes SwiftPM's Clang module caches (`.build/<triple>/<configuration>/ModuleCache`)
+/// from a copied project.
+///
+/// A precompiled module records the absolute module-cache path it was built
+/// under, so the copy's cache is rejected ("was compiled with module cache path
+/// …") and the baseline build fails before any mutant runs. The compiler
+/// rebuilds the cache, so removal is best-effort: anything left behind surfaces
+/// as that same build error.
+func removeCopiedModuleCaches(
+    inProjectAt projectDirectory: String,
+    using fileManager: FileSystemManager
+) {
+    let build = (projectDirectory as NSString).appendingPathComponent(".build")
+
+    for triple in (try? fileManager.contentsOfDirectory(atPath: build)) ?? [] {
+        let tripleDirectory = (build as NSString).appendingPathComponent(triple)
+
+        for configuration in (try? fileManager.contentsOfDirectory(atPath: tripleDirectory)) ?? [] {
+            let cache = ((tripleDirectory as NSString)
+                .appendingPathComponent(configuration) as NSString)
+                .appendingPathComponent("ModuleCache")
+
+            if fileManager.fileExists(atPath: cache) {
+                try? fileManager.removeItem(atPath: cache)
+            }
         }
     }
 }
