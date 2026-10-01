@@ -12,11 +12,14 @@ final class MuterRewriter: SyntaxRewriter {
             return super.visit(node)
         }
 
-        let newNode = MutationSwitch.apply(
-            mutationSchemata: mutationSchemata,
-            with: node
-        )
+        // Rewrite nested blocks while they still have the identities their
+        // schemata are keyed by, then wrap the result. Wrapping first rebuilds
+        // the children in a new tree, and their schemata never match.
+        let childrenRewritten = super.visit(node)
 
-        return super.visit(newNode)
+        return MutationSwitch.apply(
+            mutationSchemata: mutationSchemata,
+            with: childrenRewritten
+        )
     }
 }

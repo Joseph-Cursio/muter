@@ -65,6 +65,38 @@ final class RewriterTests: MuterTestCase {
 
         AssertSnapshot(formatCode(mutatedSourceCode.description))
     }
+
+    // Schemata are keyed by syntax node identity. Wrapping an outer block in its
+    // mutation switch first rebuilds its inner blocks in a new tree, so the inner
+    // blocks' own schemata never matched and were silently dropped. Those mutants
+    // were reported as survived without ever running.
+    func test_rewritesSchemataInBlocksNestedInsideMutatedBlocks() throws {
+        let source = SourceCodeInfo(
+            path: "/path/to/nested.swift",
+            code: Parser.parse(source: """
+            func search(_ a: Int, _ limit: Int) -> Bool {
+                let small = a < 10
+                var index = 0
+                while index < limit {
+                    if a == index {
+                        return true
+                    }
+                    index += 1
+                }
+                return small && a != limit
+            }
+            """)
+        )
+        let mapping = try XCTUnwrap(generateSchemataMappings(for: source).first)
+        let schemata = mapping.mutationSchemata
+        let lines = Set(schemata.map(\.position.line))
+        XCTAssertTrue(lines.contains(2) && lines.contains(5), "fixture needs outer and nested mutants: \(lines.sorted())")
+
+        let rewritten = MuterRewriter(mapping).rewrite(source.code).description
+
+        let missing = schemata.map(\.id).filter { !rewritten.contains($0) }
+        XCTAssertEqual(missing, [], "mutants never written into the source")
+    }
 }
 
 private let allOperatorsSourceCode =
